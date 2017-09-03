@@ -1,0 +1,39 @@
+.main {
+  text-align: center;
+
+  .header {
+    height: 45px;
+    background-color: #3b444c;
+    box-shadow: 1px 1px 5px #3b444c;
+    text-align: center;
+
+    h1 {
+      color: #fff;
+      font-size: 21px;
+      font-weight: bold;
+      margin: 0;
+      padding-top: 7px;
+      cursor: default;
+    }
+  }
+
+  .pixi-container {
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center
+  }
+
+  .control-panel {
+    span {
+      display: inline-block;
+      text-align: left;
+      min-width: 120px;
+    }
+  }
+
+  #downloader {
+    font-size: 20px;
+    font-weight: bold;
+  }
+}
