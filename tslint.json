@@ -11,7 +11,8 @@
             "jsx-double"
         ],
         "member-access": false,
-        "arrow-parens": false
+        "arrow-parens": false,
+        "max-classes-per-file": false
     },
     "rulesDirectory": []
 }
