@@ -61,10 +61,20 @@ class Particle {
     this.sprite.destroy();
   }
 }
-export default class Main extends React.Component {
+
+interface IState {
+  hasError: boolean;
+}
+
+export default class Main extends React.Component<{}, IState> {
   private mouseX = Number.MAX_VALUE;
   private mouseY = Number.MAX_VALUE;
   private isOnSetup = false;
+
+  constructor() {
+    super();
+    this.state = { hasError: false };
+  }
 
   handleMouseMove = (evt: PIXI.interaction.InteractionEvent) => {
     this.mouseX = (evt.data.originalEvent as MouseEvent).clientX;
@@ -72,10 +82,15 @@ export default class Main extends React.Component {
   }
 
   setUp = () => {
+    this.setState({ hasError: false });
+
     particles.forEach(d => d.destroy());
     particles = [];
 
     const url = (this.refs.input as HTMLInputElement).value;
+    if (!PIXI.loader.resources[url].texture) {
+      return this.setState({ hasError: true });
+    }
     const texture = PIXI.loader.resources[url].texture.baseTexture;
     rendererHeight = rendererWidth / (texture.width / texture.height);
     pixiAPP.renderer.resize(rendererWidth, rendererHeight);
@@ -117,7 +132,7 @@ export default class Main extends React.Component {
       (this.refs.pixi as HTMLElement).appendChild(pixiAPP.view);
       this.renderParticles();
     }, 10);
-
+    PIXI.loader.onError.add(() => setTimeout(this.setState({ hasError: true })));
     pixiAPP.stage.on('mousemove', this.handleMouseMove);
     pixiAPP.ticker.add(this.renderingLoop);
   }
@@ -138,6 +153,8 @@ export default class Main extends React.Component {
           />
           <button className="button" onClick={this.renderParticles}>Submit</button>
         </div>
+        { this.state.hasError && <p className="error">Sorry, that image cannot be loaded because its server doesn't allow it, plz try another one, like: http://davidguan.me/assets/136133c6ea2e29e457cea61fbbc06ad3.png</p> }
+        <p className="desc">Image without CORS enabled on its server won't load, you can test this application with images on <a href="http://imgur.com/search?q=mountain" target="_blank">imgur.com</a></p>
         <p className="footer">
           Visit <a href="https://davidguan.me" target="_blank">davidguan.me</a> to see my other works.
         </p>
