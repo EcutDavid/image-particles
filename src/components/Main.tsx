@@ -14,10 +14,9 @@ const yOffest = frameHeight + frameMargin;
 const maxSpeed = 40;
 const DEFAULT_IMG = 'http://davidguan.me/book.jpg';
 
-const pixiAPP = new PIXI.Application({ backgroundColor: 0xffffff, width: rendererWidth, height: rendererHeight });
-pixiAPP.renderer.autoResize = true;
+const pixiAPP = new PIXI.Application({ backgroundColor: 0xffffff, width: rendererWidth, height: rendererHeight, autoResize: true });
 pixiAPP.stage.interactive = true;
-const Particles: Particle[] = [];
+let particles: Particle[] = [];
 
 class Particle {
   private speedX = 0;
@@ -58,58 +57,69 @@ class Particle {
   }
 
   destroy() {
+    pixiAPP.stage.removeChild(this.sprite);
     this.sprite.destroy();
   }
 }
-
-export default class Main extends React.Component<{}, {}> {
-  private sprite = new PIXI.Sprite(PIXI.Texture.EMPTY);
-  private needUpdateDownloadLink = false;
+export default class Main extends React.Component {
   private mouseX = Number.MAX_VALUE;
   private mouseY = Number.MAX_VALUE;
+  private isOnSetup = false;
 
   handleMouseMove = (evt: PIXI.interaction.InteractionEvent) => {
     this.mouseX = (evt.data.originalEvent as MouseEvent).clientX;
     this.mouseY = (evt.data.originalEvent as MouseEvent).clientY;
   }
+
   setUp = () => {
-    Particles.forEach(element => {
-      element.destroy();
-    });
-    const texture = PIXI.loader.resources[DEFAULT_IMG].texture.baseTexture;
+    particles.forEach(d => d.destroy());
+    particles = [];
+
+    const url = (this.refs.input as HTMLInputElement).value;
+    const texture = PIXI.loader.resources[url].texture.baseTexture;
     rendererHeight = rendererWidth / (texture.width / texture.height);
     pixiAPP.renderer.resize(rendererWidth, rendererHeight);
     const scale = rendererWidth / texture.width;
 
-    const xLoopCount = Math.floor(rendererWidth / xOffest);
-
-    const yLoopCount = Math.floor(rendererHeight / yOffest);
+    const xLoopCount = Math.floor(rendererWidth / xOffest) - 1;
+    const yLoopCount = Math.floor(rendererHeight / yOffest) - 1;
     for (let i = 0; i < xLoopCount; i++) {
       for (let j = 0; j < yLoopCount; j++) {
-        Particles.push(new Particle(i * xOffest, j * yOffest, scale, texture));
+        particles.push(new Particle(i * xOffest, j * yOffest, scale, texture));
       }
     }
+    this.isOnSetup = false;
+  }
+
+  renderingLoop = () => {
+    if (this.isOnSetup) { return; }
+
+    const mouseX = this.mouseX - pixiAPP.renderer.view.offsetLeft;
+    const mouseY = this.mouseY - pixiAPP.renderer.view.offsetTop;
+
+    particles.forEach(element => element.update(mouseX, mouseY));
+    pixiAPP.render();
+  }
+
+  renderParticles = () => {
+    this.isOnSetup = true;
+    const url = (this.refs.input as HTMLInputElement).value;
+    if (PIXI.loader.resources[url]) { return this.setUp(); }
+
+    const load = PIXI.loader
+      .add(url)
+      .load(this.setUp);
   }
 
   componentDidMount() {
-    // Letting pixi finishs its initiliazation stuff
+    // Letting pixi finishs its initiliazation stuff, that why it needs 10ms
     setTimeout(() => {
       (this.refs.pixi as HTMLElement).appendChild(pixiAPP.view);
-      PIXI.loader
-        .add(DEFAULT_IMG)
-        .load(this.setUp);
-    }, 100);
+      this.renderParticles();
+    }, 10);
 
     pixiAPP.stage.on('mousemove', this.handleMouseMove);
-    pixiAPP.ticker.add(() => {
-      const mouseX = this.mouseX - pixiAPP.renderer.view.offsetLeft;
-      const mouseY = this.mouseY - pixiAPP.renderer.view.offsetTop;
-
-      Particles.forEach(element => {
-        element.update(mouseX, mouseY);
-      });
-      pixiAPP.render();
-    });
+    pixiAPP.ticker.add(this.renderingLoop);
   }
 
   render() {
@@ -123,9 +133,14 @@ export default class Main extends React.Component<{}, {}> {
           Image URL:
           <input
             type="text"
+            ref="input"
             defaultValue={DEFAULT_IMG}
           />
+          <button className="button" onClick={this.renderParticles}>Submit</button>
         </div>
+        <p className="footer">
+          Visit <a href="https://davidguan.me" target="_blank">davidguan.me</a> to see my other works.
+        </p>
       </div>
     );
   }
