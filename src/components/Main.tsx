@@ -1,10 +1,11 @@
 import * as PIXI from 'pixi.js';
 import * as React from 'react';
+import * as THREE from 'three';
 
 import 'styles/main.scss';
 declare function require(name: string);
 const rendererWidth = 800;
-let rendererHeight = 600;
+let rendererHeight = 900;
 
 const frameWidth = 10;
 const frameHeight = 10;
@@ -12,53 +13,80 @@ const frameMargin = 0;
 const xOffest = frameWidth + frameMargin;
 const yOffest = frameHeight + frameMargin;
 const maxSpeed = 40;
-const DEFAULT_IMG = 'http://davidguan.me/book.jpg';
+const DEFAULT_IMG = 'http://i.imgur.com/P9IVqkS.jpg';
 
-const pixiAPP = new PIXI.Application({ backgroundColor: 0xffffff, width: rendererWidth, height: rendererHeight, autoResize: true });
-pixiAPP.stage.interactive = true;
 let particles: Particle[] = [];
+const loader = new THREE.TextureLoader();
+let material: THREE.MeshBasicMaterial;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+const camera = new THREE.OrthographicCamera(
+  -rendererWidth / 2, rendererWidth / 2,
+  frameHeight / 2, -frameHeight / 2,
+  1, 2000,
+);
+camera.position.z = 500;
+
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(rendererWidth, rendererHeight);
 
 class Particle {
   private speedX = 0;
   private speedY = 0;
-  private sprite: PIXI.Sprite;
+  private mesh: THREE.Mesh;
 
-  constructor(private posX: number, private posY: number, private scale: number, baseTexture: PIXI.BaseTexture) {
-    this.sprite = new PIXI.Sprite(new PIXI.Texture(baseTexture));
-    this.sprite.scale.set(scale, scale);
+  constructor(private posX: number, private posY: number) {
+    // posY = rendererHeight - posY;
+    const geometry = new THREE.PlaneGeometry(frameWidth, frameHeight, 1);
 
-    this.sprite.texture.frame = new PIXI.Rectangle(
-      posX / scale,
-      posY / scale,
-      frameWidth / scale,
-      frameHeight / scale,
-    );
-    this.sprite.x = Math.random() * rendererWidth;
-    this.sprite.y = Math.random() * rendererHeight;
+    const startVec2 = new THREE.Vector2(posX / rendererWidth, 1 - posY / rendererHeight);
+    const endVec2 = new THREE.Vector2((posX + frameWidth) / rendererWidth, 1 - (posY + frameHeight) / rendererHeight);
 
-    pixiAPP.stage.addChild(this.sprite);
+    const ratioVec2 = new THREE.Vector2(posX / rendererWidth, posY / rendererHeight);
+    geometry.faceVertexUvs[0][0] = [
+      startVec2,
+      new THREE.Vector2(startVec2.x, endVec2.y),
+      new THREE.Vector2(endVec2.x, startVec2.y),
+    ];
+    geometry.faceVertexUvs[0][1] = [
+      new THREE.Vector2(startVec2.x, endVec2.y),
+      endVec2,
+      new THREE.Vector2(endVec2.x, startVec2.y),
+    ];
+    // console.log(geometry.faceVertexUvs);
+
+    this.mesh = new THREE.Mesh(geometry, material);
+    scene.add(this.mesh);
+
+    // console.log(-(posY - rendererHeight / 2));
+
+    this.mesh.position.x = Math.random() * rendererWidth - rendererWidth / 2;
+    this.mesh.position.y = Math.random() * rendererHeight - rendererHeight / 2;
+    this.posX = posX - rendererWidth / 2;
+    this.posY = -(posY - rendererHeight / 2);
   }
 
   update(mouseX: number, mouseY: number) {
-    this.speedX = (this.posX - this.sprite.x) / rendererWidth * maxSpeed;
-    this.speedY = (this.posY - this.sprite.y) / rendererHeight * maxSpeed;
+    this.speedX = (this.posX - this.mesh.position.x) / rendererWidth * maxSpeed;
+    this.speedY = (this.posY - this.mesh.position.y) / rendererHeight * maxSpeed;
 
-    const distance = Math.sqrt(Math.pow(mouseX - this.sprite.x, 2) + Math.pow(mouseY - this.sprite.y, 2));
-    if (distance < 50) {
-      const accX = (mouseX - this.sprite.x);
-      this.speedX -= accX;
+    // const distance = Math.sqrt(Math.pow(mouseX - this.mesh.position.x, 2) + Math.pow(mouseY - this.mesh.position.y, 2));
+    // if (distance < 50) {
+    //   const accX = (mouseX - this.mesh.position.x);
+    //   this.speedX -= accX;
 
-      const accY = (mouseY - this.sprite.y);
-      this.speedY -= accY;
-    }
+    //   const accY = (mouseY - this.mesh.position.y);
+    //   this.speedY -= accY;
+    // }
 
-    this.sprite.x += this.speedX;
-    this.sprite.y += this.speedY;
+    this.mesh.position.x += this.speedX;
+    this.mesh.position.y += this.speedY;
   }
 
   destroy() {
-    pixiAPP.stage.removeChild(this.sprite);
-    this.sprite.destroy();
+    // pixiAPP.stage.removeChild(this.sprite);
+    scene.remove(this.mesh);
   }
 }
 
@@ -77,64 +105,65 @@ export default class Main extends React.Component<{}, IState> {
   }
 
   handleMouseMove = (evt: PIXI.interaction.InteractionEvent) => {
-    this.mouseX = (evt.data.originalEvent as MouseEvent).clientX;
-    this.mouseY = (evt.data.originalEvent as MouseEvent).clientY;
+    // this.mouseX = (evt.data.originalEvent as MouseEvent).clientX;
+    // this.mouseY = (evt.data.originalEvent as MouseEvent).clientY;
   }
 
-  setUp = () => {
+  setUp = (texture: HTMLImageElement) => {
     this.setState({ hasError: false });
 
     particles.forEach(d => d.destroy());
     particles = [];
 
-    const url = (this.refs.input as HTMLInputElement).value;
-    if (!PIXI.loader.resources[url].texture) {
-      return this.setState({ hasError: true });
-    }
-    const texture = PIXI.loader.resources[url].texture.baseTexture;
+    // const url = (this.refs.input as HTMLInputElement).value;
     rendererHeight = rendererWidth / (texture.width / texture.height);
-    pixiAPP.renderer.resize(rendererWidth, rendererHeight);
-    const scale = rendererWidth / texture.width;
+    camera.top = rendererHeight / 2;
+    camera.bottom = -rendererHeight / 2;
+    camera.updateProjectionMatrix();
+    renderer.setSize(rendererWidth, rendererHeight);
 
     const xLoopCount = Math.floor(rendererWidth / xOffest) - 1;
     const yLoopCount = Math.floor(rendererHeight / yOffest) - 1;
     for (let i = 0; i < xLoopCount; i++) {
       for (let j = 0; j < yLoopCount; j++) {
-        particles.push(new Particle(i * xOffest, j * yOffest, scale, texture));
+        particles.push(new Particle(i * xOffest, j * yOffest));
       }
     }
+    particles.push(new Particle(0, 0));
     this.isOnSetup = false;
   }
 
   renderingLoop = () => {
-    if (this.isOnSetup) { return; }
+    // if (this.isOnSetup) { return; }
 
-    const mouseX = this.mouseX - pixiAPP.renderer.view.offsetLeft;
-    const mouseY = this.mouseY - pixiAPP.renderer.view.offsetTop;
+    // const mouseX = this.mouseX - pixiAPP.renderer.view.offsetLeft;
+    // const mouseY = this.mouseY - pixiAPP.renderer.view.offsetTop;
 
-    particles.forEach(element => element.update(mouseX, mouseY));
-    pixiAPP.render();
+    particles.forEach(element => element.update(0, 0));
+    renderer.render(scene, camera);
+    requestAnimationFrame(this.renderingLoop);
   }
 
   renderParticles = () => {
-    this.isOnSetup = true;
+    // this.isOnSetup = true;
     const url = (this.refs.input as HTMLInputElement).value;
-    if (PIXI.loader.resources[url]) { return this.setUp(); }
+    // if (PIXI.loader.resources[url]) { return this.setUp(); }
 
-    const load = PIXI.loader
-      .add(url)
-      .load(this.setUp);
+    // const load = PIXI.loader
+    //   .add(url)
+    //   .load(this.setUp);
+    loader.load(DEFAULT_IMG, (texture: THREE.Texture) => {
+      material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+      this.setUp(texture.image);
+      this.renderingLoop();
+    });
   }
 
   componentDidMount() {
-    // Letting pixi finishs its initiliazation stuff, that why it needs 10ms
-    setTimeout(() => {
-      (this.refs.pixi as HTMLElement).appendChild(pixiAPP.view);
-      this.renderParticles();
-    }, 10);
-    PIXI.loader.onError.add(() => setTimeout(this.setState({ hasError: true })));
-    pixiAPP.stage.on('mousemove', this.handleMouseMove);
-    pixiAPP.ticker.add(this.renderingLoop);
+    (this.refs.pixi as HTMLElement).appendChild(renderer.domElement);
+    this.renderParticles();
+    // PIXI.loader.onError.add(() => setTimeout(this.setState({ hasError: true })));
+    // pixiAPP.stage.on('mousemove', this.handleMouseMove);
   }
 
   render() {
